@@ -1,0 +1,153 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SuperAdmin
+  Admin
+  Teacher
+  Student
+  Visitor
+}
+
+enum ActiveStatus {
+  Active
+  InActive
+}
+
+enum Gender {
+  L
+  P
+  N
+}
+
+model User {
+  id                  Int             @id @default(autoincrement())
+  userId              String          @unique @default(uuid())
+  email               String          @unique
+  name                String
+  password            String
+  role                Role
+  status              ActiveStatus    @default(InActive)
+  identityNumber      String?         @unique
+  resetPasswordToken  String?
+  resetTokenExpires   DateTime?
+  verifiedAt          DateTime?
+  createdAt           DateTime?       @default(now())
+  updatedAt           DateTime?       @updatedAt
+  deletedAt           DateTime?
+
+  admin               Admin[]
+  teacher             Teacher[]
+  student             Student[]
+  visitor             Visitor[]
+}
+
+model Faculty {
+  id                Int             @id                 @default(autoincrement())
+  name              String
+  code              String          @unique
+  createdAt         DateTime?       @default(now())
+  updatedAt         DateTime?       @updatedAt
+
+  student           Student[]
+  studyProgram      StudyProgram[]
+}
+
+model StudyProgram {
+  id            Int             @id                 @default(autoincrement())
+  facultyId     Int?
+  name          String
+  code          String          @unique
+  createdAt     DateTime?       @default(now())
+  updatedAt     DateTime?       @updatedAt
+
+  faculty       Faculty?        @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  student       Student[]
+}
+
+model Admin {
+  id                Int             @id           @default(autoincrement())
+  userId            Int             @unique
+  profilePicture    String?
+  position          String?
+  gender            Gender?
+  createdAt         DateTime?       @default(now())
+  updatedAt         DateTime?       @updatedAt
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Teacher {
+  id                Int           @id         @default(autoincrement())
+  userId            Int           @unique
+  profilePicture    String?
+  gender            Gender?
+  phoneNumber       String?       @unique     @db.VarChar(20)
+  validUntil        DateTime?     @db.Date
+  createdAt         DateTime?     @default(now())
+  updatedAt         DateTime?     @updatedAt
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Student {
+  id                Int             @id           @default(autoincrement())
+  userId            Int             @unique
+  profilePicture    String?
+  gender            Gender?
+  phoneNumber       String?         @unique       @db.VarChar(20)
+  facultyId         Int?
+  studyProgramId    Int?
+  validUntil        DateTime?       @db.Date
+  createdAt         DateTime?       @default(now())
+  updatedAt         DateTime?       @updatedAt
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  faculty           Faculty?        @relation(fields: [facultyId], references: [id], onDelete: SetNull)
+  studyProgram      StudyProgram?   @relation(fields: [studyProgramId], references: [id], onDelete: SetNull)
+}
+
+model Visitor {
+  id            Int             @id            @default(autoincrement())
+  userId        Int?
+  name          String
+  activity      String
+  date          DateTime        @db.Date
+  time          DateTime        @db.Time
+  createdAt     DateTime?       @default(now())
+  updatedAt     DateTime?       @updatedAt
+  
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id              Int             @id        @default(autoincrement())
+  type            String
+  content         String
+  transactionId   Int
+  createdAt       DateTime?       @default(now())
+  updatedAt       DateTime?       @updatedAt
+}
+
+model AuthToken {
+  id              Int             @id        @default(autoincrement())
+  accessToken     String          @db.LongText
+  refreshToken    String          @db.LongText
+  createdAt       DateTime?       @default(now())
+  updatedAt       DateTime?       @updatedAt
+
+  @@map("auth_token")
+}
