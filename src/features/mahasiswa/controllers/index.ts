@@ -1,29 +1,29 @@
 import { NextFunction, Request, Response } from "express";
 
 import { errorResponse, successResponse } from "../../../utils/response";
-import { deletedDosenService, getAllDosenExportService, getAllDosenService, getDetailDosenService, importDosenService, storeActionSelected, storeDosenService, updateDosenService } from "../services";
+import { deletedMahasiswaService, getAllMahasiswaExportService, getAllMahasiswaService, getDetailMahasiswaService, importMahasiswaService, storeActionSelected, storeMahasiswaService, updateMahasiswaService } from "../services";
 import { CustomError } from "../../../errors";
-import { dataSelectionInterface, formInterface, queryGetListDataDosen } from "../interface";
+import { dataSelectionInterface, formInterface, modalListDataMahasiswa, queryGetListDataMahasiswa } from "../interface";
 import { storeValidation, updateValidation } from "../validations";
 
 import ExcelJS from "exceljs";
 import * as fs from "fs";
 
-const getAllDosen = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+const getAllMahasiswa = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
-        const { limit, page, name, nidn, status } = req.query;
+        const { limit, page, name, nim, status } = req.query;
 
-        const queryData: queryGetListDataDosen = {};
+        const queryData: queryGetListDataMahasiswa = {};
 
         if (limit) queryData.limit = Number(limit);
         if (page) queryData.page = Number(page);
         if (name) queryData.name = name as string;
-        if (nidn) queryData.nidn = nidn as string;
+        if (nim) queryData.nim = nim as string;
         if (status) queryData.status = status as string;
 
-        const data = await getAllDosenService(queryData);
+        const data = await getAllMahasiswaService(queryData);
 
-		return successResponse(res, data, "Data dosen berhasil didapatkan", 200);
+		return successResponse(res, data, "Data mahasiswa berhasil didapatkan", 200);
 	} catch (error: any) {
         if (error instanceof CustomError) {
             return errorResponse(res, error.data, error.message, error.statusCode);
@@ -50,11 +50,11 @@ const ActionSelected = async (req: Request, res: Response, next: NextFunction): 
     }
 }
 
-const DeletedDosen = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+const DeletedMahasiswa = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const { userId } = req.params;
 
-        await deletedDosenService({ userId: userId });
+        await deletedMahasiswaService({ userId: userId });
 
         return successResponse(res, true, "Data berhasil dihapus", 200);
     } catch (error: any) {
@@ -65,7 +65,7 @@ const DeletedDosen = async (req: Request, res: Response, next: NextFunction): Pr
     }
 }
 
-const StoreDosen = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+const StoreMahasiswa = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const { error } = storeValidation.validate(req.body, { abortEarly: false });
         
@@ -81,16 +81,18 @@ const StoreDosen = async (req: Request, res: Response, next: NextFunction): Prom
         const request: formInterface = {
             profilePicture: req.body.profilePicture,
             name: req.body.name,
-            nidn: req.body.nidn,
+            nim: req.body.nim,
             gender: req.body.gender,
             phoneNumber: req.body.phoneNumber,
             email: req.body.email,
             password: req.body.password,
+            faculty: req.body.faculty,
+            department: req.body.department,
             status: req.body.status,
             validUntil: req.body.validUntil,
         };
 
-        const data = await storeDosenService(request);
+        const data = await storeMahasiswaService(request);
 
         return successResponse(res, data, "Data berhasil disimpan", 201);
     } catch (error: any) {
@@ -101,14 +103,14 @@ const StoreDosen = async (req: Request, res: Response, next: NextFunction): Prom
     }
 }
 
-const getDetailDosen = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+const getDetailMahasiswa = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
 
         const { userId } = req.params;
 
-        const data = await getDetailDosenService({ userId: userId });
+        const data = await getDetailMahasiswaService({ userId: userId });
 
-		return successResponse(res, data, "Data dosen berhasil didapatkan", 200);
+		return successResponse(res, data, "Data mahasiswa berhasil didapatkan", 200);
 	} catch (error: any) {
         if (error instanceof CustomError) {
             return errorResponse(res, error.data, error.message, error.statusCode);
@@ -117,7 +119,7 @@ const getDetailDosen = async (req: Request, res: Response, next: NextFunction): 
 	}
 }
 
-const UpdateDosen = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+const UpdateMahasiswa = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const { error } = updateValidation.validate(req.body, { abortEarly: false });
         
@@ -135,16 +137,18 @@ const UpdateDosen = async (req: Request, res: Response, next: NextFunction): Pro
         const request: formInterface = {
             profilePicture: req.body.profilePicture,
             name: req.body.name,
-            nidn: req.body.nidn,
+            nim: req.body.nim,
             gender: req.body.gender,
             phoneNumber: req.body.phoneNumber,
             email: req.body.email,
             password: req.body.password,
+            faculty: req.body.faculty,
+            department: req.body.department,
             status: req.body.status,
             validUntil: req.body.validUntil,
         };
 
-        const data = await updateDosenService(request, userId);
+        const data = await updateMahasiswaService(request, userId);
 
         return successResponse(res, data, "Data berhasil diperbarui", 201);
     } catch (error: any) {
@@ -155,7 +159,7 @@ const UpdateDosen = async (req: Request, res: Response, next: NextFunction): Pro
     }
 }
 
-const SampleExportDosen = async(_req: Request, res: Response, _next: NextFunction): Promise<any> => {
+const SampleExportMahasiswa = async(_req: Request, res: Response, _next: NextFunction): Promise<any> => {
     const data = [
         { "No": 1, "Nama": "John Doe", "NIDN": "123481231231", "Jenis Kelamin (L/P)": "L", "No. Hp": "081241231312", "Email": "youremail@gmail.com", "Password": "123456" },
         { "No": 2, "Nama": "John Doe", "NIDN": "123481231231", "Jenis Kelamin (L/P)": "L", "No. Hp": "081241231312", "Email": "youremail@gmail.com", "Password": "123456" },
@@ -207,7 +211,7 @@ const SampleExportDosen = async(_req: Request, res: Response, _next: NextFunctio
 
     worksheet.views = [{ state: "frozen", ySplit: 1 }];
 
-    const filename = "sample data dosen.xlsx";
+    const filename = "sample data mahasiswa.xlsx";
     await workbook.xlsx.writeFile(filename);
 
     res.download(filename, () => {
@@ -215,14 +219,14 @@ const SampleExportDosen = async(_req: Request, res: Response, _next: NextFunctio
     });
 }
 
-const DataImportDosen = async(req: Request, res: Response, next: NextFunction): Promise<any> => {
+const DataImportMahasiswa = async(req: Request, res: Response, next: NextFunction): Promise<any> => {
     try {
         const { dataImport } = req.body;
         if (!dataImport) {
             return res.status(400).json({ message: "Base64 file is required" });
         }
         
-        const data = await importDosenService(dataImport)
+        const data = await importMahasiswaService(dataImport)
     
         return successResponse(res, data[0], data[1], 201);
     } catch (error: any) {
@@ -233,18 +237,20 @@ const DataImportDosen = async(req: Request, res: Response, next: NextFunction): 
     }
 }
 
-const DataExportDosen = async(_req: Request, res: Response, _next: NextFunction): Promise<any> => {
-    const getExport = await getAllDosenExportService();
+const DataExportMahasiswa = async(_req: Request, res: Response, _next: NextFunction): Promise<any> => {
+    const getExport = await getAllMahasiswaExportService();
     const data: {}[] = [];
-    getExport['formattedTeachers'].map((item: { name: string; nidn: string; gender: string; phone: string; email: string; status: string; waktu_terdaftar: string; }, index: number) => {
-        const timeRegister = new Date(item.waktu_terdaftar);
+    getExport['formattedStudents'].map((item: modalListDataMahasiswa, index: number) => {
+        const timeRegister = new Date(item.waktu_terdaftar || "");
         data.push({
             "No": index + 1,
             "Nama": item.name,
-            "NIDN": item.nidn,
+            "NIM": item.nim,
             "Jenis Kelamin": item.gender,
             "No. Hp": item.phone,
             "Email": item.email,
+            "Fakultas": item.faculty,
+            "Program Studi": item.department,
             "status": item.status,
             "Waktu Terdaftar": timeRegister.toLocaleString("id-ID")
         })
@@ -292,11 +298,12 @@ const DataExportDosen = async(_req: Request, res: Response, _next: NextFunction)
 
     worksheet.views = [{ state: "frozen", ySplit: 1 }];
 
-    const filename = "data dosen.xlsx";
+    const filename = "data mahasiswa.xlsx";
     await workbook.xlsx.writeFile(filename);
 
     res.download(filename, () => {
         fs.unlinkSync(filename); // Hapus setelah di-download
     });
 }
-export { getAllDosen, ActionSelected, DeletedDosen, StoreDosen, getDetailDosen, UpdateDosen, SampleExportDosen, DataExportDosen, DataImportDosen };
+
+export { getAllMahasiswa, ActionSelected, DeletedMahasiswa, StoreMahasiswa, getDetailMahasiswa, UpdateMahasiswa, SampleExportMahasiswa, DataExportMahasiswa, DataImportMahasiswa };

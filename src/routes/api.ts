@@ -4,6 +4,7 @@ import { visitRoutes } from '../features/visit/routes';
 import { profileRoutes } from '../features/profile/routes';
 import { dosenRoutes } from '../features/dosen/routes';
 import { mahasiswaRoutes } from '../features/mahasiswa/routes';
+import { optionRoutes } from '../features/option/routes';
 
 export const apiRoutes = Router();
 
@@ -12,3 +13,4 @@ apiRoutes.use("/visitor/", visitRoutes);
 apiRoutes.use("/profile/", profileRoutes);
 apiRoutes.use("/dosen/", dosenRoutes);
 apiRoutes.use("/mahasiswa/", mahasiswaRoutes);
+apiRoutes.use("/option/", optionRoutes);

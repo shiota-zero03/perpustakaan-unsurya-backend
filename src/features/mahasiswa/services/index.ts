@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { dataSelectionInterface, formInterface, modalDetailDataDosen, modalListDataDosen, queryGetListDataDosen } from "../interface";
+import { dataSelectionInterface, formInterface, modalDetailDataMahasiswa, modalListDataMahasiswa, queryGetListDataMahasiswa } from "../interface";
 import { getTimeZone } from "../../../utils/date-format";
 import { saveBase64File } from "../../../utils/base64Handler";
 import { CustomError } from "../../../errors";
@@ -19,23 +19,23 @@ const userSelect: Prisma.UserSelect = {
     role: true
 };
 
-export const getAllDosenService = async ({
+export const getAllMahasiswaService = async ({
     page = 1,
     limit = 10,
     name,
-    nidn,
+    nim,
     status,
-}: queryGetListDataDosen): Promise<any> => {
+}: queryGetListDataMahasiswa): Promise<any> => {
 
     const offset = (page - 1) * limit;
     const whereClause: any = {};
 
     if (name) whereClause.name = { contains: name };
-    if (nidn) whereClause.identityNumber = { contains: nidn };
+    if (nim) whereClause.identityNumber = { contains: nim };
     if (status) whereClause.status = status;
-    whereClause.role = "Teacher";
+    whereClause.role = "Student";
 
-    const [getAllTeacher, totalTeachers] = await prisma.$transaction([
+    const [getAllStudents, totalStudents] = await prisma.$transaction([
         prisma.user.findMany({
             where: whereClause,
             skip: offset,
@@ -45,32 +45,32 @@ export const getAllDosenService = async ({
                 { id: 'desc' }
             ],
             include: {
-                teacher: true,
+                student: true,
             },
         }),
         prisma.user.count({ where: whereClause }),
     ]);
 
-    const formattedTeachers: modalListDataDosen[] = getAllTeacher.map(user => ({
+    const formattedStudents: modalListDataMahasiswa[] = getAllStudents.map(user => ({
         id: user.userId,
         name: user.name,
         email: user.email,
-        nidn: user.identityNumber,
+        nim: user.identityNumber,
         status: user.status === 'Active' ? 'Aktif' : (user.verifiedAt ? 'Tidak Aktif' : 'Belum Diverifikasi'),
         waktu_terdaftar: user.createdAt ? user.createdAt.toISOString() : null,
     }));
 
-    const from = formattedTeachers.length > 0 ? ((page - 1) * limit + 1) : 0;
-    const to = formattedTeachers.length > 0 ? Math.min(page * limit, totalTeachers) : 0;
+    const from = formattedStudents.length > 0 ? ((page - 1) * limit + 1) : 0;
+    const to = formattedStudents.length > 0 ? Math.min(page * limit, totalStudents) : 0;
 
     return {
-        data: formattedTeachers,
+        data: formattedStudents,
         pagination: {
             from,
             to,
             currentPage: page,
-            totalPages: Math.ceil(totalTeachers / limit),
-            totalItems: totalTeachers,
+            totalPages: Math.ceil(totalStudents / limit),
+            totalItems: totalStudents,
             limit,
         },
     };
@@ -107,11 +107,11 @@ export const storeActionSelected = async (data: dataSelectionInterface): Promise
     return true;
 };
 
-export const deletedDosenService = async ({ userId }: { userId: string }): Promise<any> => {
+export const deletedMahasiswaService = async ({ userId }: { userId: string }): Promise<any> => {
     const checkUser = await prisma.user.findUnique({ where: { userId } });
 
     if (!checkUser) {
-        throw new CustomError("Dosen tidak ditemukan", 404, {});
+        throw new CustomError("Mahasiswa tidak ditemukan", 404, {});
     }
 
     await prisma.$transaction(async (prisma) => {
@@ -121,15 +121,23 @@ export const deletedDosenService = async ({ userId }: { userId: string }): Promi
     return true;
 };
 
-export const storeDosenService = async (data: formInterface): Promise<any> => {
+export const storeMahasiswaService = async (data: formInterface): Promise<any> => {
     const existingUserByEmail = await prisma.user.findUnique({ where: { email: data.email || "" } });
     if (existingUserByEmail) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { email: "Email sudah digunakan" });
 
-    const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: data.nidn || "" } });
-    if (existingUserByIdentityNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { nidn: "Nomor identitas sudah digunakan" });
+    const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: data.nim || "" } });
+    if (existingUserByIdentityNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { nim: "Nomor identitas sudah digunakan" });
 
-    const existingUserByPhoneNumber = await prisma.teacher.findUnique({ where: { phoneNumber: data.phoneNumber || "" } });
+    const existingUserByPhoneNumber = await prisma.student.findUnique({ where: { phoneNumber: data.phoneNumber || "" } });
     if (existingUserByPhoneNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { phoneNumber: "Nomor telepon sudah digunakan" });
+
+    const facultyCheck = await prisma.faculty.findUnique({ where: { id: data.faculty || 0 } });
+    if (!facultyCheck) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { faculty: `Fakultas dengan id ${data.faculty} tidak ditemukan` });
+
+    const prodyCheck = await prisma.studyProgram.findUnique({ where: { id: data.department || 0 } });    
+    if (!prodyCheck) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { department: `Program studi dengan id ${data.department} tidak ditemukan` });
+
+    if(prodyCheck.facultyId !== facultyCheck.id) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { department: `Program studi dengan id ${data.department} tidak cocok dengan fakultas dengan id ${data.faculty}` });
 
     let profilePicture = null;
 
@@ -168,19 +176,21 @@ export const storeDosenService = async (data: formInterface): Promise<any> => {
                     email: data.email || "",
                     name: data.name || "",
                     password: await hashedContent(data.password || ""),
-                    role: 'Teacher',
-                    identityNumber: data.nidn || "",
+                    role: 'Student',
+                    identityNumber: data.nim || "",
                     status: data.status === 'Active' ? 'Active' : 'InActive',
                     verifiedAt: setTimeZone['timeZone'] 
                 },
                 select: userSelect,
             });
 
-            await prisma.teacher.create({
+            await prisma.student.create({
                 data: {
                     userId: user.id,
                     profilePicture: profilePicture,
                     gender: data.gender || null,
+                    facultyId: data.faculty,
+                    studyProgramId: data.department,
                     phoneNumber: data.phoneNumber || null,
                     validUntil: validUntil,
                 },
@@ -193,7 +203,7 @@ export const storeDosenService = async (data: formInterface): Promise<any> => {
             userId: transaction.userId,
             email: transaction.email,
             name: transaction.name,
-            accountType: 'Dosen',
+            accountType: 'Mahasiswa',
         };
     } catch (error) {
         console.error("Error saat melakukan transaksi:", error);
@@ -201,40 +211,53 @@ export const storeDosenService = async (data: formInterface): Promise<any> => {
     }
 };
 
-export const getDetailDosenService = async ({ userId }: { userId: string }): Promise<any> => {
+export const getDetailMahasiswaService = async ({ userId }: { userId: string }): Promise<any> => {
 
     const getUser = await prisma.user.findUnique({ 
         where: { userId },
         include: {
-            teacher: true
+            student: {
+                include: {
+                    faculty: true,
+                    studyProgram: true
+                }
+            }
         }
     });
 
     if (!getUser) {
-        throw new CustomError("Dosen tidak ditemukan", 404, {});
+        throw new CustomError("Mahasiswa tidak ditemukan", 404, {});
     }
 
-    const formattedTeachers: modalDetailDataDosen = {
+    const formattedStudents: modalDetailDataMahasiswa = {
         id: getUser.userId,
         name: getUser.name,
         email: getUser.email,
         nidn: getUser.identityNumber,
         status: getUser.status === 'Active' ? 'Aktif' : (getUser.verifiedAt ? 'Tidak Aktif' : 'Belum Diverifikasi'),
         waktu_terdaftar: getUser.createdAt ? getUser.createdAt.toISOString() : null,
-        gender: getUser.teacher[0].gender || null,
-        phone_number: getUser.teacher[0].phoneNumber || null,
-        valid_until: getUser.teacher[0].validUntil ? getUser.teacher[0].validUntil.toISOString() : null,
-        profile_picture: getUser.teacher[0].profilePicture || null
+        gender: getUser.student[0].gender || null,
+        phone_number: getUser.student[0].phoneNumber || null,
+        faculty: getUser.student[0].faculty ? {
+            id: getUser.student[0].faculty.id,
+            name: getUser.student[0].faculty.name,
+        } : null,
+        department: getUser.student[0].studyProgram ? {
+            id: getUser.student[0].studyProgram.id,
+            name: getUser.student[0].studyProgram.name,
+        } : null,
+        valid_until: getUser.student[0].validUntil ? getUser.student[0].validUntil.toISOString() : null,
+        profile_picture: getUser.student[0].profilePicture || null
     };
 
-    return formattedTeachers;
+    return formattedStudents;
 };
 
-export const updateDosenService = async (data: formInterface, userId: string): Promise<any> => {
+export const updateMahasiswaService = async (data: formInterface, userId: string): Promise<any> => {
     const getUser = await prisma.user.findUnique({ 
         where: { userId },
         include: {
-            teacher: true
+            student: true
         }
     });
 
@@ -246,16 +269,23 @@ export const updateDosenService = async (data: formInterface, userId: string): P
         const existingUserByEmail = await prisma.user.findUnique({ where: { email: data.email || "" } });
         if (existingUserByEmail) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { email: "Email sudah digunakan" });
     }
-    if(data && data.nidn !== getUser.identityNumber) {
-        const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: data.nidn || "" } });
-        if (existingUserByIdentityNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { nidn: "Nomor identitas sudah digunakan" });
+    if(data && data.nim !== getUser.identityNumber) {
+        const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: data.nim || "" } });
+        if (existingUserByIdentityNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { nim: "Nomor identitas sudah digunakan" });
     }
-    if(data && data.phoneNumber !== getUser.teacher[0].phoneNumber) {
-        const existingUserByPhoneNumber = await prisma.teacher.findUnique({ where: { phoneNumber: data.phoneNumber || "" } });
+    if(data && data.phoneNumber !== getUser.student[0].phoneNumber) {
+        const existingUserByPhoneNumber = await prisma.student.findUnique({ where: { phoneNumber: data.phoneNumber || "" } });
         if (existingUserByPhoneNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { phoneNumber: "Nomor telepon sudah digunakan" });
     }
 
-    let profilePicture: string | null | undefined = getUser.teacher[0].profilePicture || null;
+    const facultyCheck = await prisma.faculty.findUnique({ where: { id: data.faculty || 0 } });
+    if (!facultyCheck) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { faculty: `Fakultas dengan id ${data.faculty} tidak ditemukan` });
+
+    const prodyCheck = await prisma.studyProgram.findUnique({ where: { id: data.department || 0 } });    
+    if (!prodyCheck) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { department: `Program studi dengan id ${data.department} tidak ditemukan` });
+
+    if(prodyCheck.facultyId !== facultyCheck.id) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { department: `Program studi dengan id ${data.department} tidak cocok dengan fakultas dengan id ${data.faculty}` });
+    let profilePicture: string | null | undefined = getUser.student[0].profilePicture || null;
 
     if (data.profilePicture) {
         const date = new Date();
@@ -295,15 +325,15 @@ export const updateDosenService = async (data: formInterface, userId: string): P
                     email: data.email || "",
                     name: data.name || "",
                     password: data.password ? await hashedContent(data.password || "") : getUser.password,
-                    role: 'Teacher',
-                    identityNumber: data.nidn || "",
+                    role: 'Student',
+                    identityNumber: data.nim || "",
                     status: data.status === 'Active' ? 'Active' : 'InActive',
                     verifiedAt: setTimeZone['timeZone'] 
                 },
                 select: userSelect,
             });
 
-            await prisma.teacher.update({
+            await prisma.student.update({
                 where: {
                     userId: getUser.id
                 },
@@ -311,6 +341,8 @@ export const updateDosenService = async (data: formInterface, userId: string): P
                     profilePicture: profilePicture,
                     gender: data.gender || null,
                     phoneNumber: data.phoneNumber || null,
+                    facultyId: data.faculty,
+                    studyProgramId: data.department,
                     validUntil: validUntil,
                 },
             });
@@ -322,7 +354,7 @@ export const updateDosenService = async (data: formInterface, userId: string): P
             userId: transaction.userId,
             email: transaction.email,
             name: transaction.name,
-            accountType: 'Dosen',
+            accountType: 'Mahasiswa',
         };
     } catch (error) {
         console.error("Error saat melakukan transaksi:", error);
@@ -330,12 +362,12 @@ export const updateDosenService = async (data: formInterface, userId: string): P
     }
 };
 
-export const getAllDosenExportService = async (): Promise<any> => {
+export const getAllMahasiswaExportService = async (): Promise<any> => {
 
     const whereClause: any = {};
-    whereClause.role = "Teacher";
+    whereClause.role = "Student";
 
-    const [getAllTeacher] = await prisma.$transaction([
+    const [getAllStudents] = await prisma.$transaction([
         prisma.user.findMany({
             where: whereClause,
             orderBy: [
@@ -343,29 +375,36 @@ export const getAllDosenExportService = async (): Promise<any> => {
                 { id: 'desc' }
             ],
             include: {
-                teacher: true,
+                student: {
+                    include: {
+                        faculty: true,
+                        studyProgram: true
+                    }
+                },
             },
         }),
         prisma.user.count({ where: whereClause }),
     ]);
 
-    const formattedTeachers: modalListDataDosen[] = getAllTeacher.map(user => ({
+    const formattedStudents: modalListDataMahasiswa[] = getAllStudents.map(user => ({
         id: user.userId,
         name: user.name,
         email: user.email,
-        gender: user.teacher[0].gender,
-        phone: user.teacher[0].phoneNumber,
-        nidn: user.identityNumber,
+        gender: user.student[0].gender,
+        phone: user.student[0].phoneNumber,
+        nim: user.identityNumber,
+        faculty: user.student[0].faculty?.name,
+        department: user.student[0].studyProgram?.name,
         status: user.status === 'Active' ? 'Aktif' : (user.verifiedAt ? 'Tidak Aktif' : 'Belum Diverifikasi'),
         waktu_terdaftar: user.createdAt ? user.createdAt.toISOString() : null,
     }));
 
     return {
-        formattedTeachers
+        formattedStudents
     };
 };
 
-export const importDosenService = async (dataImport: string): Promise<any> => {
+export const importMahasiswaService = async (dataImport: string): Promise<any> => {
     
     const dataForImport = await importBase64ExcelFile(dataImport);
     if (dataForImport.success === false) throw new CustomError(dataForImport.message, 422);
@@ -384,7 +423,7 @@ export const importDosenService = async (dataImport: string): Promise<any> => {
         }
 
         const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: item['NIDN'] || "" } });
-        const existingUserByPhoneNumber = await prisma.teacher.findUnique({ where: { phoneNumber: item['No. Hp'] || "" } });
+        const existingUserByPhoneNumber = await prisma.student.findUnique({ where: { phoneNumber: item['No. Hp'] || "" } });
         const nidn = existingUserByIdentityNumber ? null : item['NIDN'];
         const phone = existingUserByPhoneNumber ? null : item['No. Hp'];
 
@@ -401,7 +440,7 @@ export const importDosenService = async (dataImport: string): Promise<any> => {
                         email: item['Email'] || "",
                         name: item['Nama'] || "",
                         password: await hashedContent(item['Password'] || "123456"),
-                        role: 'Teacher',
+                        role: 'Student',
                         identityNumber: nidn,
                         status: 'Active',
                         verifiedAt: setTimeZone['timeZone'],
@@ -409,7 +448,7 @@ export const importDosenService = async (dataImport: string): Promise<any> => {
                     select: userSelect,
                 });
 
-                await prisma.teacher.create({
+                await prisma.student.create({
                     data: {
                         userId: user.id,
                         profilePicture: null,
