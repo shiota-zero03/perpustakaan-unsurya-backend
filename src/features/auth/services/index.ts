@@ -5,7 +5,6 @@ import { hashedContent, hashedVerification } from "../../../utils/bcrypt";
 import { sendEmail } from "../../../utils/send-email";
 import { CustomError } from "../../../errors";
 import { v4 as uuidv4 } from 'uuid';
-import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -176,7 +175,7 @@ export const forgotPasswordService = async (email: string): Promise<any> => {
         throw new CustomError(`Pengguna dengan email ${email} tidak ditemukan`, 404);
     }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetToken = uuidv4();
     const resetTokenExpires = new Date(Date.now() + 3600 * 1000);
 
     await prisma.user.update({
