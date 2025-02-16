@@ -1,41 +1,28 @@
-export interface queryGetListDataMahasiswa {
+export interface queryGetListDataPetugas {
     page?: number;
     limit?: number;
     name?: string;
-    nim?: string;
+    email?: string;
     status?: string;
 }
 
-export interface modalListDataMahasiswa {
+export interface modalListDataPetugas {
     id: string;
     name: string | null;
     email: string | null;
-    nim: string | null;
     status: string | null;
     waktu_terdaftar: string | null;
     gender?: string | null;
-    phone?: string | null;
-    faculty?: string | null;
-    department?: string | null;
+    position?: string | null;
 }
 
-export interface modalDetailDataMahasiswa {
+export interface modalDetailDataPetugas {
     id: string;
     name: string | null;
     email: string | null;
-    nim: string | null;
     status: string | null;
     gender: string | null;
-    phone_number: string | null;
-    faculty: {
-        id: number;
-        name: string;
-    } | null;
-    department: {
-        id: number;
-        name: string;
-    } | null;
-    valid_until: string | null;
+    position: string | null;
     waktu_terdaftar: string | null;
     profile_picture: string | null;
 }
@@ -48,13 +35,9 @@ export interface dataSelectionInterface {
 export interface formInterface {
     profilePicture?: string | null;
     name?: string | null;
-    nim?: string | null;
     gender?: 'L' | 'P' | 'N' | null;
-    phoneNumber?: string | null;
     email?: string | null;
     password?: string | null;
     status?: string | null;
-    faculty?: number | null;
-    department?: number | null;
-    validUntil?: string | null;
+    position?: string | null;
 }

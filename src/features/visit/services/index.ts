@@ -5,6 +5,14 @@ import { getTimeZone } from "../../../utils/date-format";
 
 const prisma = new PrismaClient();
 
+interface queryGetListDataVisitor {
+    page?: number;
+    limit?: number;
+    identityNumber?: string;
+    name?: string;
+    date?: string;
+}
+
 const userSelect: Prisma.VisitorSelect = {
     id: true,
     userId: true,
@@ -16,12 +24,9 @@ export const createVisitService = async (data: VisitReq): Promise<any> => {
     let userId = null;
     let userName = null;
 
-    const existingUser = await prisma.user.findFirst({
+    const existingUser = await prisma.user.findUnique({
         where: {
-            OR: [
-                { email: data.member },
-                { identityNumber: data.member },
-            ],
+            identityNumber: data.member,
         },
     });
       
@@ -38,12 +43,12 @@ export const createVisitService = async (data: VisitReq): Promise<any> => {
     const setTimeZone = getTimeZone('Asia/Jakarta', now)
 
     const existingVisitor = await prisma.visitor.findFirst({
-    where: {
-        AND: [
-        { userId: userId },
-        { date: { gte: setTimeZone['startOfDay'], lte: setTimeZone['endOfDay'] } }, // Cek range waktu dalam hari yang sama
-        ],
-    },
+        where: {
+            AND: [
+                { userId: userId },
+                { date: { gte: setTimeZone['startOfDay'], lte: setTimeZone['endOfDay'] } }, // Cek range waktu dalam hari yang sama
+            ],
+        },
     });
 
     if (existingVisitor) {
@@ -56,8 +61,8 @@ export const createVisitService = async (data: VisitReq): Promise<any> => {
 				userId: userId,
                 name: userName,
                 activity: data.activity,
-                date: setTimeZone['startOfDay'],
-                time: setTimeZone['timeZone']
+                date: setTimeZone['timeZone'].replace('+07:00', '+00:00'),
+                time: setTimeZone['timeZone'].replace('+07:00', '+00:00')
 			},
 			select: userSelect,
 		});
@@ -76,5 +81,64 @@ export const createVisitService = async (data: VisitReq): Promise<any> => {
     return {
         name: transaction.name,
         activity: transaction.activity,
+    };
+};
+
+export const getVisitService = async ({
+    page = 1,
+    limit = 10,
+    identityNumber,
+    name,
+    date
+}: queryGetListDataVisitor): Promise<any> => {
+
+    const offset = (page - 1) * limit;
+    const whereClause: any = {};
+
+    if (identityNumber) whereClause.user = {identityNumber: { contains: identityNumber }};
+    if (name) whereClause.name = { contains: name };
+    if (date) {
+        const now = new Date(date);
+        const setTimeZone = getTimeZone('Asia/Jakarta', now)
+        whereClause.date = { gte: setTimeZone['startOfDay'], lte: setTimeZone['endOfDay'] }
+    };
+
+    const [getAllVisitor, totalVisitors] = await prisma.$transaction([
+        prisma.visitor.findMany({
+            where: whereClause,
+            skip: offset,
+            take: limit,
+            orderBy: [
+                { createdAt: 'desc' },
+                { id: 'desc' }
+            ],
+            include: {
+                user: true,
+            },
+        }),
+        prisma.visitor.count({ where: whereClause }),
+    ]);
+
+    const formattedVisitors = getAllVisitor.map(visit => ({
+        id: visit.id,
+        member: visit.user?.identityNumber,
+        name: visit.name,
+        activity: visit.activity,
+        time: visit.date.toISOString().split('T')[0]
+    }));
+
+    const from = formattedVisitors.length > 0 ? ((page - 1) * limit + 1) : 0;
+    const to = formattedVisitors.length > 0 ? Math.min(page * limit, totalVisitors) : 0;
+
+    return {
+        data: formattedVisitors,
+        pagination: {
+            from,
+            to,
+            currentPage: page,
+            totalPages: Math.ceil(totalVisitors / limit),
+            totalItems: totalVisitors,
+            limit,
+        },
     };
 };

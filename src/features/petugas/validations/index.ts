@@ -10,29 +10,16 @@ export const storeValidation = Joi.object({
     "string.max": "Nama maksimal harus memiliki 255 karakter.",
     "any.required": "Nama wajib diisi."
   }),
-  faculty: Joi.number().empty("").empty(0).required().messages({
-    "number.base": "Fakultas tidak valid.",
-    "any.required": "Fakultas wajib diisi."
-  }),
-  department: Joi.number().empty("").empty(0).required().messages({
-    "number.base": "Program studi tidak valid.",
-    "any.required": "Program studi wajib diisi."
-  }),
-  nim: Joi.string().min(3).max(255).empty("").required().messages({
-    "string.base": "NIM tidak valid.",
-    "string.min": "NIM minimal harus memiliki 3 karakter.",
-    "string.max": "NIM maksimal harus memiliki 255 karakter.",
-    "any.required": "NIM wajib diisi."
+  position: Joi.string().min(3).max(255).empty("").required().messages({
+    "string.base": "Jabatan tidak valid.",
+    "string.min": "Jabatan minimal harus memiliki 3 karakter.",
+    "string.max": "Jabatan maksimal harus memiliki 255 karakter.",
+    "any.required": "Jabatan wajib diisi."
   }),
   gender: Joi.string().valid("L", "P", "N").empty("").required().messages({
     "string.base": "Jenis kelamin tidak valid.",
     "any.only": "Jenis kelamin harus di antara Laki - Laki atau Perempuan.",
     "any.required": "Jenis kelamin wajib diisi."
-  }),
-  phoneNumber: Joi.string().pattern(/^[0-9]{10,15}$/).empty("").required().messages({
-    "string.base": "Nomor telepon tidak valid.",
-    "string.pattern.base": "Nomor telepon tidak valid. Harus terdiri dari 10-15 digit.",
-    "any.required": "Nomor telepon wajib diisi."
   }),
   email: Joi.string().email().max(255).empty("").required().messages({
     "string.base": "Email tidak valid.",
@@ -51,11 +38,6 @@ export const storeValidation = Joi.object({
     "any.only": "Status harus di antara 'Active' atau 'InActive'.",
     "any.required": "Status wajib diisi."
   }),
-  validUntil: Joi.date().greater("now").empty("").required().messages({
-    "date.base": "Masa berlaku tidak valid",
-    "date.greater": "Masa berlaku harus lebih dari tanggal sekarang.",
-    "any.required": "Masa berlaku wajib diisi."
-  }),
 });
 
 export const updateValidation = Joi.object({
@@ -72,29 +54,10 @@ export const updateValidation = Joi.object({
     "string.max": "Nama maksimal harus memiliki 255 karakter.",
     "any.required": "Nama wajib diisi."
   }),
-  faculty: Joi.number().empty("").empty(0).required().messages({
-    "number.base": "Fakultas tidak valid.",
-    "any.required": "Fakultas wajib diisi."
-  }),
-  department: Joi.number().empty("").empty(0).required().messages({
-    "number.base": "Program studi tidak valid.",
-    "any.required": "Program studi wajib diisi."
-  }),
-  nim: Joi.string().min(3).max(255).empty("").required().messages({
-    "string.base": "NIM tidak valid.",
-    "string.min": "NIM minimal harus memiliki 3 karakter.",
-    "string.max": "NIM maksimal harus memiliki 255 karakter.",
-    "any.required": "NIM wajib diisi."
-  }),
   gender: Joi.string().valid("L", "P", "N").empty("").required().messages({
     "string.base": "Jenis kelamin tidak valid.",
     "any.only": "Jenis kelamin harus di antara Laki - Laki atau Perempuan.",
     "any.required": "Jenis kelamin wajib diisi."
-  }),
-  phoneNumber: Joi.string().pattern(/^[0-9]{10,15}$/).empty("").required().messages({
-    "string.base": "Nomor telepon tidak valid.",
-    "string.pattern.base": "Nomor telepon tidak valid. Harus terdiri dari 10-15 digit.",
-    "any.required": "Nomor telepon wajib diisi."
   }),
   email: Joi.string().email().max(255).empty("").required().messages({
     "string.base": "Email tidak valid.",
@@ -102,14 +65,15 @@ export const updateValidation = Joi.object({
     "string.max": "Email maksimal harus memiliki 255 karakter.",
     "any.required": "Email wajib diisi."
   }),
+  position: Joi.string().min(3).max(255).empty("").required().messages({
+    "string.base": "Jabatan tidak valid.",
+    "string.min": "Jabatan minimal harus memiliki 3 karakter.",
+    "string.max": "Jabatan maksimal harus memiliki 255 karakter.",
+    "any.required": "Jabatan wajib diisi."
+  }),
   status: Joi.string().valid("Active", "InActive").empty("").required().messages({
     "string.base": "Status tidak valid.",
     "any.only": "Status harus di antara 'Active' atau 'InActive'.",
     "any.required": "Status wajib diisi."
-  }),
-  validUntil: Joi.date().greater("now").empty("").required().messages({
-    "date.base": "Masa berlaku tidak valid",
-    "date.greater": "Masa berlaku harus lebih dari tanggal sekarang.",
-    "any.required": "Masa berlaku wajib diisi."
   }),
 });

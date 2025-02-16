@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting seeding...');
   
-  // await userSeeder(prisma);
+  await userSeeder(prisma);
   await FacultySeeder(prisma);
   await prodiSeeder(prisma);
   

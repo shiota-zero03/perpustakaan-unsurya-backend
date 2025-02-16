@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { dataSelectionInterface, formInterface, modalDetailDataDosen, modalListDataDosen, queryGetListDataDosen } from "../interface";
+import { dataSelectionInterface, formInterface, modalDetailDataPetugas, modalListDataPetugas, queryGetListDataPetugas } from "../interface";
 import { getTimeZone } from "../../../utils/date-format";
 import { saveBase64File } from "../../../utils/base64Handler";
 import { CustomError } from "../../../errors";
@@ -19,23 +19,23 @@ const userSelect: Prisma.UserSelect = {
     role: true
 };
 
-export const getAllDosenService = async ({
+export const getAllPetugasService = async ({
     page = 1,
     limit = 10,
     name,
-    nidn,
+    email,
     status,
-}: queryGetListDataDosen): Promise<any> => {
+}: queryGetListDataPetugas): Promise<any> => {
 
     const offset = (page - 1) * limit;
     const whereClause: any = {};
 
     if (name) whereClause.name = { contains: name };
-    if (nidn) whereClause.identityNumber = { contains: nidn };
+    if (email) whereClause.email = { contains: email };
     if (status) whereClause.status = status;
-    whereClause.role = "Teacher";
+    whereClause.role = "Admin";
 
-    const [getAllTeacher, totalTeachers] = await prisma.$transaction([
+    const [getAllAdmins, totalAdmins] = await prisma.$transaction([
         prisma.user.findMany({
             where: whereClause,
             skip: offset,
@@ -45,32 +45,32 @@ export const getAllDosenService = async ({
                 { id: 'desc' }
             ],
             include: {
-                teacher: true,
+                admin: true,
             },
         }),
         prisma.user.count({ where: whereClause }),
     ]);
 
-    const formattedTeachers: modalListDataDosen[] = getAllTeacher.map(user => ({
+    const formattedPetugas: modalListDataPetugas[] = getAllAdmins.map(user => ({
         id: user.userId,
         name: user.name,
         email: user.email,
-        nidn: user.identityNumber,
+        nim: user.identityNumber,
         status: user.status === 'Active' ? 'Aktif' : (user.verifiedAt ? 'Tidak Aktif' : 'Belum Diverifikasi'),
         waktu_terdaftar: user.createdAt ? user.createdAt.toISOString() : null,
     }));
 
-    const from = formattedTeachers.length > 0 ? ((page - 1) * limit + 1) : 0;
-    const to = formattedTeachers.length > 0 ? Math.min(page * limit, totalTeachers) : 0;
+    const from = formattedPetugas.length > 0 ? ((page - 1) * limit + 1) : 0;
+    const to = formattedPetugas.length > 0 ? Math.min(page * limit, totalAdmins) : 0;
 
     return {
-        data: formattedTeachers,
+        data: formattedPetugas,
         pagination: {
             from,
             to,
             currentPage: page,
-            totalPages: Math.ceil(totalTeachers / limit),
-            totalItems: totalTeachers,
+            totalPages: Math.ceil(totalAdmins / limit),
+            totalItems: totalAdmins,
             limit,
         },
     };
@@ -107,11 +107,11 @@ export const storeActionSelected = async (data: dataSelectionInterface): Promise
     return true;
 };
 
-export const deletedDosenService = async ({ userId }: { userId: string }): Promise<any> => {
+export const deletedPetugasService = async ({ userId }: { userId: string }): Promise<any> => {
     const checkUser = await prisma.user.findUnique({ where: { userId } });
 
     if (!checkUser) {
-        throw new CustomError("Dosen tidak ditemukan", 404, {});
+        throw new CustomError("Petugas tidak ditemukan", 404, {});
     }
 
     await prisma.$transaction(async (prisma) => {
@@ -121,15 +121,9 @@ export const deletedDosenService = async ({ userId }: { userId: string }): Promi
     return true;
 };
 
-export const storeDosenService = async (data: formInterface): Promise<any> => {
+export const storePetugasService = async (data: formInterface): Promise<any> => {
     const existingUserByEmail = await prisma.user.findUnique({ where: { email: data.email || "" } });
     if (existingUserByEmail) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { email: "Email sudah digunakan" });
-
-    const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: data.nidn || "" } });
-    if (existingUserByIdentityNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { nidn: "Nomor identitas sudah digunakan" });
-
-    const existingUserByPhoneNumber = await prisma.teacher.findUnique({ where: { phoneNumber: data.phoneNumber || "" } });
-    if (existingUserByPhoneNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { phoneNumber: "Nomor telepon sudah digunakan" });
 
     let profilePicture = null;
 
@@ -147,16 +141,6 @@ export const storeDosenService = async (data: formInterface): Promise<any> => {
         profilePicture = database64.filePath;
     }
 
-    let validUntil = null;
-    if (data.validUntil) {
-        const date = new Date(data.validUntil);
-        if (!isNaN(date.getTime())) {
-            validUntil = date.toISOString(); // Jika validUntil valid, ubah ke ISO string
-        } else {
-            throw new CustomError("Masa berlakuk tidak valid", 422, { validUntil: "Tanggal tidak valid" });
-        }
-    }
-
     const now = new Date();
     const setTimeZone = getTimeZone('Asia/Jakarta', now)
 
@@ -168,21 +152,19 @@ export const storeDosenService = async (data: formInterface): Promise<any> => {
                     email: data.email || "",
                     name: data.name || "",
                     password: await hashedContent(data.password || ""),
-                    role: 'Teacher',
-                    identityNumber: data.nidn || "",
+                    role: 'Admin',
                     status: data.status === 'Active' ? 'Active' : 'InActive',
                     verifiedAt: setTimeZone['timeZone'] 
                 },
                 select: userSelect,
             });
 
-            await prisma.teacher.create({
+            await prisma.admin.create({
                 data: {
                     userId: user.id,
                     profilePicture: profilePicture,
                     gender: data.gender || null,
-                    phoneNumber: data.phoneNumber || null,
-                    validUntil: validUntil,
+                    position: data.position
                 },
             });
 
@@ -193,7 +175,7 @@ export const storeDosenService = async (data: formInterface): Promise<any> => {
             userId: transaction.userId,
             email: transaction.email,
             name: transaction.name,
-            accountType: 'Dosen',
+            accountType: 'Petugas',
         };
     } catch (error) {
         console.error("Error saat melakukan transaksi:", error);
@@ -201,61 +183,51 @@ export const storeDosenService = async (data: formInterface): Promise<any> => {
     }
 };
 
-export const getDetailDosenService = async ({ userId }: { userId: string }): Promise<any> => {
+export const getDetailPetugasService = async ({ userId }: { userId: string }): Promise<any> => {
 
     const getUser = await prisma.user.findUnique({ 
         where: { userId },
         include: {
-            teacher: true
+            admin: true
         }
     });
 
     if (!getUser) {
-        throw new CustomError("Dosen tidak ditemukan", 404, {});
+        throw new CustomError("Petugas tidak ditemukan", 404, {});
     }
 
-    const formattedTeachers: modalDetailDataDosen = {
+    const formattedPetugas: modalDetailDataPetugas = {
         id: getUser.userId,
         name: getUser.name,
         email: getUser.email,
-        nidn: getUser.identityNumber,
         status: getUser.status === 'Active' ? 'Aktif' : (getUser.verifiedAt ? 'Tidak Aktif' : 'Belum Diverifikasi'),
         waktu_terdaftar: getUser.createdAt ? getUser.createdAt.toISOString() : null,
-        gender: getUser.teacher[0].gender || null,
-        phone_number: getUser.teacher[0].phoneNumber || null,
-        valid_until: getUser.teacher[0].validUntil ? getUser.teacher[0].validUntil.toISOString() : null,
-        profile_picture: getUser.teacher[0].profilePicture || null
+        gender: getUser.admin[0].gender || null,
+        position: getUser.admin[0].position || null,
+        profile_picture: getUser.admin[0].profilePicture || null
     };
 
-    return formattedTeachers;
+    return formattedPetugas;
 };
 
-export const updateDosenService = async (data: formInterface, userId: string): Promise<any> => {
+export const updatePetugasService = async (data: formInterface, userId: string): Promise<any> => {
     const getUser = await prisma.user.findUnique({ 
         where: { userId },
         include: {
-            teacher: true
+            admin: true
         }
     });
 
     if (!getUser) {
-        throw new CustomError("Dosen tidak ditemukan", 404, {});
+        throw new CustomError("Petugas tidak ditemukan", 404, {});
     }
 
     if(data && data.email !== getUser.email) {
         const existingUserByEmail = await prisma.user.findUnique({ where: { email: data.email || "" } });
         if (existingUserByEmail) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { email: "Email sudah digunakan" });
     }
-    if(data && data.nidn !== getUser.identityNumber) {
-        const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: data.nidn || "" } });
-        if (existingUserByIdentityNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { nidn: "Nomor identitas sudah digunakan" });
-    }
-    if(data && data.phoneNumber !== getUser.teacher[0].phoneNumber) {
-        const existingUserByPhoneNumber = await prisma.teacher.findUnique({ where: { phoneNumber: data.phoneNumber || "" } });
-        if (existingUserByPhoneNumber) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { phoneNumber: "Nomor telepon sudah digunakan" });
-    }
 
-    let profilePicture: string | null | undefined = getUser.teacher[0].profilePicture || null;
+    let profilePicture: string | null | undefined = getUser.admin[0].profilePicture || null;
 
     if (data.profilePicture) {
         const date = new Date();
@@ -269,16 +241,6 @@ export const updateDosenService = async (data: formInterface, userId: string): P
         if (database64.success === false) throw new CustomError("Kesalahan validasi, silahkan cek kembali form anda", 422, { profilePicture: database64.message });
 
         profilePicture = database64.filePath;
-    }
-
-    let validUntil = null;
-    if (data.validUntil) {
-        const date = new Date(data.validUntil);
-        if (!isNaN(date.getTime())) {
-            validUntil = date.toISOString(); // Jika validUntil valid, ubah ke ISO string
-        } else {
-            throw new CustomError("Masa berlakuk tidak valid", 422, { validUntil: "Tanggal tidak valid" });
-        }
     }
 
     const now = new Date();
@@ -295,23 +257,21 @@ export const updateDosenService = async (data: formInterface, userId: string): P
                     email: data.email || "",
                     name: data.name || "",
                     password: data.password ? await hashedContent(data.password || "") : getUser.password,
-                    role: 'Teacher',
-                    identityNumber: data.nidn || "",
+                    role: 'Admin',
                     status: data.status === 'Active' ? 'Active' : 'InActive',
                     verifiedAt: setTimeZone['timeZone'] 
                 },
                 select: userSelect,
             });
 
-            await prisma.teacher.update({
+            await prisma.admin.update({
                 where: {
                     userId: getUser.id
                 },
                 data: {
                     profilePicture: profilePicture,
                     gender: data.gender || null,
-                    phoneNumber: data.phoneNumber || null,
-                    validUntil: validUntil,
+                    position: data.position || null,
                 },
             });
 
@@ -322,7 +282,7 @@ export const updateDosenService = async (data: formInterface, userId: string): P
             userId: transaction.userId,
             email: transaction.email,
             name: transaction.name,
-            accountType: 'Dosen',
+            accountType: 'Petugas',
         };
     } catch (error) {
         console.error("Error saat melakukan transaksi:", error);
@@ -330,12 +290,12 @@ export const updateDosenService = async (data: formInterface, userId: string): P
     }
 };
 
-export const getAllDosenExportService = async (): Promise<any> => {
+export const getAllPetugasExportService = async (): Promise<any> => {
 
     const whereClause: any = {};
-    whereClause.role = "Teacher";
+    whereClause.role = "Admin";
 
-    const [getAllTeacher] = await prisma.$transaction([
+    const [getAllAdmins] = await prisma.$transaction([
         prisma.user.findMany({
             where: whereClause,
             orderBy: [
@@ -343,95 +303,23 @@ export const getAllDosenExportService = async (): Promise<any> => {
                 { id: 'desc' }
             ],
             include: {
-                teacher: true,
+                admin: true,
             },
         }),
         prisma.user.count({ where: whereClause }),
     ]);
 
-    const formattedTeachers: modalListDataDosen[] = getAllTeacher.map(user => ({
+    const formattedPetugas: modalListDataPetugas[] = getAllAdmins.map(user => ({
         id: user.userId,
         name: user.name,
         email: user.email,
-        gender: user.teacher[0].gender,
-        phone: user.teacher[0].phoneNumber,
-        nidn: user.identityNumber,
+        gender: user.admin[0].gender,
+        position: user.admin[0].position,
         status: user.status === 'Active' ? 'Aktif' : (user.verifiedAt ? 'Tidak Aktif' : 'Belum Diverifikasi'),
         waktu_terdaftar: user.createdAt ? user.createdAt.toISOString() : null,
     }));
 
     return {
-        formattedTeachers
+        formattedPetugas
     };
-};
-
-export const importDosenService = async (dataImport: string): Promise<any> => {
-    
-    const dataForImport = await importBase64ExcelFile(dataImport);
-    if (dataForImport.success === false) throw new CustomError(dataForImport.message, 422);
-
-    const now = new Date();
-    const dataExecute = dataForImport.data;
-
-    const dataErrors: any[] = [];
-
-    const setTimeZone = getTimeZone('Asia/Jakarta', now)
-    for (const item of dataExecute) {
-        const existingUserByEmail = await prisma.user.findUnique({ where: { email: item['Email'] || "" } });
-        if (existingUserByEmail) {
-            dataErrors.push(item['Email']);
-            continue;
-        }
-
-        const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: String(item['NIDN'] || "") } });
-        const existingUserByPhoneNumber = await prisma.teacher.findUnique({ where: { phoneNumber: String(item['No. Hp'] || "") } });
-        const nidn = existingUserByIdentityNumber ? null : String(item['NIDN']);
-        const phone = existingUserByPhoneNumber ? null : String(item['No. Hp']);
-
-        const date = new Date();
-        date.setFullYear(date.getFullYear() + 5);
-        const validUntil = date.toISOString();
-
-
-        try {
-            const transaction = await prisma.$transaction(async (prisma) => {
-                const user = await prisma.user.create({
-                    data: {
-                        userId: uuidv4(),
-                        email: item['Email'] || "",
-                        name: item['Nama'] || "",
-                        password: await hashedContent(item['Password'] || "123456"),
-                        role: 'Teacher',
-                        identityNumber: nidn,
-                        status: 'Active',
-                        verifiedAt: setTimeZone['timeZone'],
-                    },
-                    select: userSelect,
-                });
-
-                await prisma.teacher.create({
-                    data: {
-                        userId: user.id,
-                        profilePicture: null,
-                        gender: item['Jenis Kelamin (L/P)'] || null,
-                        phoneNumber: phone,
-                        validUntil: validUntil,
-                    },
-                });
-
-                return user;
-            });
-
-            continue;
-        } catch (error) {
-            console.error("Error saat melakukan transaksi:", error);
-            throw new CustomError("Terjadi kesalahan saat menyimpan data. Tidak ada perubahan yang disimpan.", 500);
-        }
-
-    }
-
-    return [
-        null,
-        `Data berhasil diimport (${dataErrors.length > 0 ? 'email: ' + dataErrors.join(", ") + ' tidak berhasil diimport karena data sudah ada' : 'semua data berhasil diimport'})`
-    ];
 };

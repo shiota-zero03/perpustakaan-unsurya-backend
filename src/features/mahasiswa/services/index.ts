@@ -233,7 +233,7 @@ export const getDetailMahasiswaService = async ({ userId }: { userId: string }):
         id: getUser.userId,
         name: getUser.name,
         email: getUser.email,
-        nidn: getUser.identityNumber,
+        nim: getUser.identityNumber,
         status: getUser.status === 'Active' ? 'Aktif' : (getUser.verifiedAt ? 'Tidak Aktif' : 'Belum Diverifikasi'),
         waktu_terdaftar: getUser.createdAt ? getUser.createdAt.toISOString() : null,
         gender: getUser.student[0].gender || null,
@@ -262,7 +262,7 @@ export const updateMahasiswaService = async (data: formInterface, userId: string
     });
 
     if (!getUser) {
-        throw new CustomError("Dosen tidak ditemukan", 404, {});
+        throw new CustomError("Mahasiswa tidak ditemukan", 404, {});
     }
 
     if(data && data.email !== getUser.email) {
@@ -416,20 +416,43 @@ export const importMahasiswaService = async (dataImport: string): Promise<any> =
 
     const setTimeZone = getTimeZone('Asia/Jakarta', now)
     for (const item of dataExecute) {
-        const existingUserByEmail = await prisma.user.findUnique({ where: { email: item['Email'] || "" } });
-        if (existingUserByEmail) {
-            dataErrors.push(item['Email']);
+        const itemNim = item['NIM'] || item['N I M'];
+        if(!itemNim) {
+            continue;
+        }
+        const checkNim = String(item['NIM'] || item['N I M'] || "");
+
+        const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: checkNim } });
+        if (existingUserByIdentityNumber) {
+            dataErrors.push(checkNim);
             continue;
         }
 
-        const existingUserByIdentityNumber = await prisma.user.findUnique({ where: { identityNumber: item['NIDN'] || "" } });
-        const existingUserByPhoneNumber = await prisma.student.findUnique({ where: { phoneNumber: item['No. Hp'] || "" } });
-        const nidn = existingUserByIdentityNumber ? null : item['NIDN'];
-        const phone = existingUserByPhoneNumber ? null : item['No. Hp'];
+        const email = `${checkNim}@unsurya.ac.id`;
+        const password = String(checkNim);
+
+        const itemPhone = String(item['No. Hp'] || item['Telepon'] || item['Phone'] || "");
+
+        const existingUserByPhoneNumber = await prisma.student.findUnique({ where: { phoneNumber: itemPhone } });
+        const phone = existingUserByPhoneNumber ? null : itemPhone;
 
         const date = new Date();
         date.setFullYear(date.getFullYear() + 5);
         const validUntil = date.toISOString();
+
+        const prodiName = item['Program Studi'] || item['PROGRAM STUDI'] || item['PRODI'] || "";
+        const programStudyCheck = await prisma.studyProgram.findFirst({
+            where: {
+                name: { contains: prodiName }
+            }
+        });
+
+        let department = null;
+        let faculty = null;
+        if(programStudyCheck) {
+            department = programStudyCheck.id;
+            faculty = programStudyCheck.facultyId;
+        }
 
 
         try {
@@ -437,11 +460,11 @@ export const importMahasiswaService = async (dataImport: string): Promise<any> =
                 const user = await prisma.user.create({
                     data: {
                         userId: uuidv4(),
-                        email: item['Email'] || "",
-                        name: item['Nama'] || "",
-                        password: await hashedContent(item['Password'] || "123456"),
+                        email: email,
+                        name: item['Nama'] || item['NAMA'] || item['N A M A'] || "",
+                        password: await hashedContent(password),
                         role: 'Student',
-                        identityNumber: nidn,
+                        identityNumber: checkNim,
                         status: 'Active',
                         verifiedAt: setTimeZone['timeZone'],
                     },
@@ -452,7 +475,9 @@ export const importMahasiswaService = async (dataImport: string): Promise<any> =
                     data: {
                         userId: user.id,
                         profilePicture: null,
-                        gender: item['Jenis Kelamin (L/P)'] || null,
+                        gender: item['Jenis Kelamin (L/P)'] || item['Jenis Kelamin'] || null,
+                        facultyId: faculty,
+                        studyProgramId: department,
                         phoneNumber: phone,
                         validUntil: validUntil,
                     },
@@ -471,6 +496,6 @@ export const importMahasiswaService = async (dataImport: string): Promise<any> =
 
     return [
         null,
-        `Data berhasil diimport (${dataErrors.length > 0 ? 'email: ' + dataErrors.join(", ") + ' tidak berhasil diimport karena data sudah ada' : 'semua data berhasil diimport'})`
+        `Data berhasil diimport (${dataErrors.length > 0 ? 'nim: ' + dataErrors.join(", ") + ' tidak berhasil diimport karena data sudah ada' : 'semua data berhasil diimport'})`
     ];
 };

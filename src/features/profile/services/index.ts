@@ -42,6 +42,12 @@ export const getProfileService = async (token: string): Promise<any> => {
                 profile: user.admin.length > 0 ? user.admin[0] : null, // Tambahkan data admin
             };
             break;
+        case 'Admin':
+            payloadUser = {
+                ...payloadUser,
+                profile: user.admin.length > 0 ? user.admin[0] : null, // Tambahkan data admin
+            };
+            break;
         default:
             break;
     }
